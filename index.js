@@ -6,8 +6,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.hostinger.com';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
-const SMTP_SECURE = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : SMTP_PORT === 465;
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+
 const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5173',
@@ -16,15 +17,17 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
 ];
-const ALLOWED_ORIGINS = [...new Set([
-  ...DEFAULT_ALLOWED_ORIGINS,
-  ...(process.env.FRONTEND_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean),
-])];
 
-// Middleware
+const ALLOWED_ORIGINS = [
+  ...new Set([
+    ...DEFAULT_ALLOWED_ORIGINS,
+    ...(process.env.FRONTEND_ORIGIN || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ]),
+];
+
 app.use(cors({
   origin(origin, callback) {
     if (!origin || ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
@@ -33,6 +36,7 @@ app.use(cors({
     return callback(new Error('CORS non autorise'));
   },
 }));
+
 app.use(express.json());
 
 function createTransporter() {
@@ -47,7 +51,6 @@ function createTransporter() {
   });
 }
 
-// Routes
 app.post('/api/contact', async (req, res) => {
   const { name, email, service, message } = req.body;
 
@@ -56,7 +59,7 @@ app.post('/api/contact', async (req, res) => {
   }
 
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !process.env.RECEIVER_EMAIL) {
-    return res.status(500).json({ error: 'Configuration email incomplète sur le serveur.' });
+    return res.status(500).json({ error: 'Configuration email incomplete sur le serveur.' });
   }
 
   const transporter = createTransporter();
@@ -80,20 +83,13 @@ app.post('/api/contact', async (req, res) => {
   try {
     await transporter.verify();
     await transporter.sendMail(mailOptions);
-
-    console.log('Message envoyé avec succès:', req.body);
-    res.status(200).json({ message: 'Message envoyé avec succès !' });
+    res.status(200).json({ message: 'Message envoye avec succes !' });
   } catch (error) {
-    console.error('Erreur lors de l\'envoi de l\'email:', error);
-
-    if (error && error.code === 'EAUTH') {
-      return res.status(500).json({
-        error: 'Échec d’authentification SMTP. Vérifiez le mot de passe de la boîte mail Hostinger.',
-      });
-    }
-
+    console.error('Erreur lors de l envoi de l email:', error);
     res.status(500).json({
-      error: 'Une erreur SMTP est survenue lors de l’envoi du message.',
+      error: error.code === 'EAUTH'
+        ? 'Echec d authentification SMTP.'
+        : 'Une erreur SMTP est survenue lors de l envoi du message.',
     });
   }
 });
@@ -114,10 +110,10 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-app.get('/', (req, res) => {
-  res.send('Serveur Freezelec en cours d\'exécution...');
+app.get('/', (_req, res) => {
+  res.send("Serveur Freezelec en cours d'execution...");
 });
 
 app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
+  console.log(`Serveur demarre sur le port ${PORT}`);
 });
